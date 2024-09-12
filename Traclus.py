@@ -13,6 +13,7 @@ def data_input(data):
     input = []
     for i in range(length):
         input.append(data[i])
+        
     return input
 trajectory = data_input(data_subset)
 
