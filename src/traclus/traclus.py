@@ -28,70 +28,88 @@ import warnings
 
 # UTILITY FUNCTIONS
 
+
 def load_trajectories(filepath):
     """
-        Load the trajectories from a pickle file.
+    Load the trajectories from a pickle file.
     """
     if not os.path.exists(filepath):
         raise FileNotFoundError("File not found at {}".format(filepath))
 
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
         trajectories = pickle.load(f)
 
     return trajectories
 
-def save_results(trajectories, partitions, segments, dist_matrix, clusters, cluster_assignments, representative_trajectories, filepath):
+
+def save_results(
+    trajectories,
+    partitions,
+    segments,
+    dist_matrix,
+    clusters,
+    cluster_assignments,
+    representative_trajectories,
+    filepath,
+):
     """
-        Save the results to a pickle file.
+    Save the results to a pickle file.
     """
     results = {
-        'trajectories': trajectories,
-        'partitions': partitions,
-        'segments': segments,
-        'dist_matrix': dist_matrix,
-        'clusters': clusters,
-        'cluster_assignments': cluster_assignments,
-        'representative_trajectories': representative_trajectories
+        "trajectories": trajectories,
+        "partitions": partitions,
+        "segments": segments,
+        "dist_matrix": dist_matrix,
+        "clusters": clusters,
+        "cluster_assignments": cluster_assignments,
+        "representative_trajectories": representative_trajectories,
     }
-    with open(filepath, 'wb') as f:
+    with open(filepath, "wb") as f:
         pickle.dump(results, f)
+
 
 def sub_sample_trajectory(trajectory, sample_n=30):
     """
-        Sub sample a trajectory to a given number of points.
+    Sub sample a trajectory to a given number of points.
     """
     if not isinstance(trajectory, np.ndarray):
         raise TypeError("Trajectory must be of type np.ndarray")
     elif trajectory.shape[1] != 2:
         raise ValueError("Trajectory must be of shape (n, 2)")
 
-    include = np.linspace(0, trajectory.shape[0]-1, sample_n, dtype=np.int32)
+    include = np.linspace(0, trajectory.shape[0] - 1, sample_n, dtype=np.int32)
     return trajectory[include]
+
 
 def calculate_line_euclidean_length(line):
     """
-        Calculate the euclidean length of a all points in the line.
+    Calculate the euclidean length of a all points in the line.
     """
     total_length = 0
     for i in range(0, line.shape[0]):
         if i == 0:
             continue
-        total_length += d_euclidean(line[i-1], line[i])
+        total_length += d_euclidean(line[i - 1], line[i])
 
     return total_length
 
+
 def get_point_projection_on_line(point, line):
     """
-        Get the projection of a point on a line.
+    Get the projection of a point on a line.
     """
 
     # Get the slope of the line using the start and end points
-    line_slope = (line[-1, 1] - line[0, 1]) / (line[-1, 0] - line[0, 0]) if line[-1, 0] != line[0, 0] else np.inf
+    line_slope = (
+        (line[-1, 1] - line[0, 1]) / (line[-1, 0] - line[0, 0])
+        if line[-1, 0] != line[0, 0]
+        else np.inf
+    )
 
     # In case the slope is infinite, we can directly get the projection
     if np.isinf(line_slope):
-        return np.array([line[0,0], point[1]])
-    
+        return np.array([line[0, 0], point[1]])
+
     # Convert the slope to a rotation matrix
     R = slope_to_rotation_matrix(line_slope)
 
@@ -100,7 +118,7 @@ def get_point_projection_on_line(point, line):
     rot_point = np.matmul(point, R.T)
 
     # Get the projection
-    proj = np.array([rot_point[0], rot_line[0,1]])
+    proj = np.array([rot_point[0], rot_line[0, 1]])
 
     # Undo the rotation for the projection
     R_inverse = np.linalg.inv(R)
@@ -108,21 +126,30 @@ def get_point_projection_on_line(point, line):
 
     return proj
 
+
 def partition2segments(partition):
     """
-        Convert a partition to a list of segments.
+    Convert a partition to a list of segments.
     """
 
     if not isinstance(partition, np.ndarray):
         raise TypeError("partition must be of type np.ndarray")
     elif partition.shape[1] != 2:
         raise ValueError("partition must be of shape (n, 2)")
-    
+
     segments = []
-    for i in range(partition.shape[0]-1):
-        segments.append(np.array([[partition[i, 0], partition[i, 1]], [partition[i+1, 0], partition[i+1, 1]]]))
+    for i in range(partition.shape[0] - 1):
+        segments.append(
+            np.array(
+                [
+                    [partition[i, 0], partition[i, 1]],
+                    [partition[i + 1, 0], partition[i + 1, 1]],
+                ]
+            )
+        )
 
     return segments
+
 
 ################# EQUATIONS #################
 
@@ -130,10 +157,11 @@ def partition2segments(partition):
 # DEPRECATED IN FAVOR OF THE SCIPY IMPLEMENTATION OF THE EUCLIDEAN DISTANCE
 # d_euclidean = lambda p1, p2: np.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
 
+
 # Perpendicular Distance
 def d_perpendicular(l1, l2):
     """
-        Calculate the perpendicular distance between two lines.
+    Calculate the perpendicular distance between two lines.
     """
     # Find the shorter line and assign that as l_shorter
     l_shorter = l_longer = None
@@ -153,12 +181,15 @@ def d_perpendicular(l1, l2):
 
     if lehmer_1 == 0 and lehmer_2 == 0:
         return 0
-    return (lehmer_1**2 + lehmer_2**2) / (lehmer_1 + lehmer_2)#, ps, pe, l_shorter[0], l_shorter[-1]
-    
+    return (lehmer_1**2 + lehmer_2**2) / (
+        lehmer_1 + lehmer_2
+    )  # , ps, pe, l_shorter[0], l_shorter[-1]
+
+
 # Parallel Distance
 def d_parallel(l1, l2):
     """
-        Calculate the parallel distance between two lines.
+    Calculate the parallel distance between two lines.
     """
     # Find the shorter line and assign that as l_shorter
     l_shorter = l_longer = None
@@ -178,10 +209,11 @@ def d_parallel(l1, l2):
 
     return min(parallel_1, parallel_2)
 
+
 # Angular Distance
 def d_angular(l1, l2, directional=True):
     """
-        Calculate the angular distance between two lines.
+    Calculate the angular distance between two lines.
     """
 
     # Find the shorter line and assign that as l_shorter
@@ -195,8 +227,16 @@ def d_angular(l1, l2, directional=True):
         l_longer = l1
 
     # Get the minimum intersecting angle between both lines
-    shorter_slope = (l_shorter[-1,1] - l_shorter[0,1]) / (l_shorter[-1,0] - l_shorter[0,0]) if l_shorter[-1,0] - l_shorter[0,0] != 0 else np.inf
-    longer_slope = (l_longer[-1,1] - l_longer[0,1]) / (l_longer[-1,0] - l_longer[0,0]) if l_longer[-1,0] - l_longer[0,0] != 0 else np.inf
+    shorter_slope = (
+        (l_shorter[-1, 1] - l_shorter[0, 1]) / (l_shorter[-1, 0] - l_shorter[0, 0])
+        if l_shorter[-1, 0] - l_shorter[0, 0] != 0
+        else np.inf
+    )
+    longer_slope = (
+        (l_longer[-1, 1] - l_longer[0, 1]) / (l_longer[-1, 0] - l_longer[0, 0])
+        if l_longer[-1, 0] - l_longer[0, 0] != 0
+        else np.inf
+    )
 
     # The case of a vertical line
     theta = None
@@ -233,73 +273,102 @@ def d_angular(l1, l2, directional=True):
     else:
         raise ValueError("Theta is not in the range of 0 to 180 degrees.")
 
+
 # Total Trajectory Distance
 def distance(l1, l2, directional=True, w_perpendicular=1, w_parallel=1, w_angular=1):
     """
-        Get the total trajectory distance using all three distance formulas.
+    Get the total trajectory distance using all three distance formulas.
     """
 
     perpendicular_distance = d_perpendicular(l1, l2)
     parallel_distance = d_parallel(l1, l2)
     angular_distance = d_angular(l1, l2, directional=directional)
 
-    return (w_perpendicular * perpendicular_distance) + (w_parallel * parallel_distance) + (w_angular * angular_distance)
+    return (
+        (w_perpendicular * perpendicular_distance)
+        + (w_parallel * parallel_distance)
+        + (w_angular * angular_distance)
+    )
+
 
 # Minimum Description Length
-def minimum_desription_length(start_idx, curr_idx, trajectory, w_angular=1, w_perpendicular=1, par=True, directional=True):
+def minimum_desription_length(
+    start_idx,
+    curr_idx,
+    trajectory,
+    w_angular=1,
+    w_perpendicular=1,
+    par=True,
+    directional=True,
+):
     """
-        Calculate the minimum description length.
+    Calculate the minimum description length.
     """
     LH = LDH = 0
-    for i in range(start_idx, curr_idx-1):
-        ed = d_euclidean(trajectory[i], trajectory[i+1])
-        LH += max(0, np.log2(ed, where=ed>0))
+    for i in range(start_idx, curr_idx - 1):
+        ed = d_euclidean(trajectory[i], trajectory[i + 1])
+        LH += max(0, np.log2(ed, where=ed > 0))
         if par:
-            for j in range(start_idx, i-1):
+            for j in range(start_idx, i - 1):
                 # print()
                 # print(np.array([trajectory[start_idx], trajectory[i]]))
                 # print(np.array([trajectory[j], trajectory[j+1]]))
-                LDH += w_perpendicular * d_perpendicular(np.array([trajectory[start_idx], trajectory[i]]), np.array([trajectory[j], trajectory[j+1]]))
-                LDH += w_angular * d_angular(np.array([trajectory[start_idx], trajectory[i]]), np.array([trajectory[j], trajectory[j+1]]), directional=directional)
+                LDH += w_perpendicular * d_perpendicular(
+                    np.array([trajectory[start_idx], trajectory[i]]),
+                    np.array([trajectory[j], trajectory[j + 1]]),
+                )
+                LDH += w_angular * d_angular(
+                    np.array([trajectory[start_idx], trajectory[i]]),
+                    np.array([trajectory[j], trajectory[j + 1]]),
+                    directional=directional,
+                )
     if par:
         return LH + LDH
     return LH
 
+
 # Slope to angle in degrees
 def slope_to_angle(slope, degrees=True):
     """
-        Convert slope to angle in degrees.
+    Convert slope to angle in degrees.
     """
     if not degrees:
         return np.arctan(slope)
     return np.arctan(slope) * 180 / np.pi
 
+
 # Slope to rotation matrix
 def slope_to_rotation_matrix(slope):
     """
-        Convert slope to rotation matrix.
+    Convert slope to rotation matrix.
     """
     return np.array([[1, slope], [-slope, 1]])
+
 
 # Get cluster majority line orientation
 def get_average_direction_slope(line_list):
     """
-        Get the cluster majority line orientation.
-        Returns 1 if the lines are mostly vertical, 0 otherwise.
+    Get the cluster majority line orientation.
+    Returns 1 if the lines are mostly vertical, 0 otherwise.
     """
     # Get the average slopes of all the lines
     slopes = []
     for line in line_list:
-        slopes.append((line[-1, 1] - line[0, 1]) / (line[-1, 0] - line[0, 0]) if (line[-1, 0] - line[0, 0]) != 0 else 0)
+        slopes.append(
+            (line[-1, 1] - line[0, 1]) / (line[-1, 0] - line[0, 0])
+            if (line[-1, 0] - line[0, 0]) != 0
+            else 0
+        )
     slopes = np.array(slopes)
 
     # Get the average slope
     return np.mean(slopes)
 
+
 # Trajectory Smoothing
 def smooth_trajectory(trajectory, window_size=5):
     """
-        Smooth a trajectory using a moving average filter.
+    Smooth a trajectory using a moving average filter.
     """
     # Ensure that the trajectory is a numpy array of shape (n, 2)
     if not isinstance(trajectory, np.ndarray):
@@ -315,46 +384,73 @@ def smooth_trajectory(trajectory, window_size=5):
 
     # Pad the trajectory with the first and last points
     padded_trajectory = np.zeros((trajectory.shape[0] + (window_size - 1), 2))
-    padded_trajectory[window_size // 2:window_size // 2 + trajectory.shape[0]] = trajectory
-    padded_trajectory[:window_size // 2] = trajectory[0]
-    padded_trajectory[-window_size // 2:] = trajectory[-1]
+    padded_trajectory[window_size // 2 : window_size // 2 + trajectory.shape[0]] = (
+        trajectory
+    )
+    padded_trajectory[: window_size // 2] = trajectory[0]
+    padded_trajectory[-window_size // 2 :] = trajectory[-1]
 
     # Apply the moving average filter
     smoothed_trajectory = np.zeros(trajectory.shape)
     for i in range(trajectory.shape[0]):
-        smoothed_trajectory[i] = np.mean(padded_trajectory[i:i + window_size], axis=0)
+        smoothed_trajectory[i] = np.mean(padded_trajectory[i : i + window_size], axis=0)
 
     return smoothed_trajectory
 
+
 # Get Distance Matrix
-def get_distance_matrix(partitions, directional=True, w_perpendicular=1, w_parallel=1, w_angular=1, progress_bar=False):
+def get_distance_matrix(
+    partitions,
+    directional=True,
+    w_perpendicular=1,
+    w_parallel=1,
+    w_angular=1,
+    progress_bar=False,
+):
     # Create Distance Matrix between all trajectories
     n_partitions = len(partitions)
     dist_matrix = np.zeros((n_partitions, n_partitions))
     for i in range(n_partitions):
-        if progress_bar: print(f'Progress: {i+1}/{n_partitions}', end='\r')
-        for j in range(i+1):
-            dist_matrix[i,j] = dist_matrix[j,i] = distance(partitions[i], partitions[j], directional=directional, w_perpendicular=w_perpendicular, w_parallel=w_parallel, w_angular=w_angular)
-            print(f'Progress: {i+1}/{n_partitions}', end='\r')
+        if progress_bar:
+            print(f"Progress: {i+1}/{n_partitions}", end="\r")
+        for j in range(i + 1):
+            dist_matrix[i, j] = dist_matrix[j, i] = distance(
+                partitions[i],
+                partitions[j],
+                directional=directional,
+                w_perpendicular=w_perpendicular,
+                w_parallel=w_parallel,
+                w_angular=w_angular,
+            )
+            print(f"Progress: {i+1}/{n_partitions}", end="\r")
 
     # Main Diagonal
     for i in range(n_partitions):
-        dist_matrix[i,i] = 0
+        dist_matrix[i, i] = 0
 
     # Check for nans and warn if any are found
     if np.isnan(dist_matrix).any():
         warnings.warn("Distance matrix contains NaN values")
-    
+
         # Replace the nans with the maximum value
         dist_matrix[np.isnan(dist_matrix)] = 9999999
 
     return dist_matrix
 
+
 #############################################
 
-def partition(trajectory, directional=True, progress_bar=False, w_perpendicular=1, w_angular=1):
+
+def partition(
+    trajectory,
+    directional=True,
+    progress_bar=False,
+    w_perpendicular=1,
+    w_angular=1,
+    magigication=1.0,
+):
     """
-        Partition a trajectory into segments.
+    Partition a trajectory into segments.
     """
 
     # Ensure that the trajectory is a numpy array of shape (n, 2)
@@ -369,36 +465,50 @@ def partition(trajectory, directional=True, progress_bar=False, w_perpendicular=
 
     traj_len = trajectory.shape[0]
     start_idx = 0
-    
+
     length = 1
     while start_idx + length < traj_len:
         if progress_bar:
-            print(f'\r{round(((start_idx + length) / traj_len) * 100, 2)}%', end='')
+            print(f"\r{round(((start_idx + length) / traj_len) * 100, 2)}%", end="")
         # print(f'Current Index: {start_idx + length}, Trajectory Length: {traj_len}')
         curr_idx = start_idx + length
         # print(start_idx, curr_idx)
         # print(f"Current Index: {curr_idx}, Current point: {trajectory[curr_idx]}")
-        cost_par = minimum_desription_length(start_idx, curr_idx, trajectory, w_angular=w_angular, w_perpendicular=w_perpendicular, directional=directional)
-        cost_nopar = minimum_desription_length(start_idx, curr_idx, trajectory, par=False, directional=directional)
+        cost_par = minimum_desription_length(
+            start_idx,
+            curr_idx,
+            trajectory,
+            w_angular=w_angular,
+            w_perpendicular=w_perpendicular,
+            directional=directional,
+        )
+        cost_nopar = (
+            minimum_desription_length(
+                start_idx, curr_idx, trajectory, par=False, directional=directional
+            )
+            * magigication
+        )  # change the magification here
         # print(f'Cost with partition: {cost_par}, Cost without partition: {cost_nopar}')
         if cost_par > cost_nopar:
             # print(f"Added characteristic point: {trajectory[curr_idx-1]} with index {curr_idx-1}")
-            cp_indices.append(curr_idx-1)
-            start_idx = curr_idx-1
+
+            cp_indices.append(curr_idx - 1)
+            start_idx = curr_idx - 1
             length = 1
         else:
             length += 1
-    
+
     # Add last point to characteristic points
     cp_indices.append(len(trajectory) - 1)
     # print(cp_indices)
-    
+
     return np.array([trajectory[i] for i in cp_indices])
+
 
 # Get Representative Trajectory
 def get_representative_trajectory(lines, min_lines=3):
     """
-        Get the sweeping line vector average.
+    Get the sweeping line vector average.
     """
     # Get the average rotation matrix for all the lines
     average_slope = get_average_direction_slope(lines)
@@ -417,7 +527,9 @@ def get_representative_trajectory(lines, min_lines=3):
     starting_and_ending_points = np.array(starting_and_ending_points)
 
     # Sort the starting and ending points by their x-coordinate
-    starting_and_ending_points = starting_and_ending_points[starting_and_ending_points[:, 0].argsort()]
+    starting_and_ending_points = starting_and_ending_points[
+        starting_and_ending_points[:, 0].argsort()
+    ]
 
     # Perform the sweeping line algorithm
     representative_points = []
@@ -452,25 +564,42 @@ def get_representative_trajectory(lines, min_lines=3):
 
     # Undo the rotation for the generated representative points
     representative_points = np.array(representative_points)
-    representative_points = np.matmul(representative_points, np.linalg.inv(rotation_matrix).T)
-    
+    representative_points = np.matmul(
+        representative_points, np.linalg.inv(rotation_matrix).T
+    )
+
     return representative_points
 
 
-def traclus(trajectories, max_eps=None, min_samples=10, directional=True, use_segments=True, clustering_algorithm=OPTICS, mdl_weights=[1,1,1], d_weights=[1,1,1], progress_bar=False):
+def traclus(
+    trajectories,
+    max_eps=None,
+    min_samples=10,
+    directional=True,
+    use_segments=True,
+    clustering_algorithm=OPTICS,
+    mdl_weights=[1, 1, 1],
+    d_weights=[1, 1, 1],
+    progress_bar=False,
+):
     """
-        Trajectory Clustering Algorithm
+    Trajectory Clustering Algorithm
     """
     # Ensure that the trajectories are a list of numpy arrays of shape (n, 2)
+
     if not isinstance(trajectories, list):
         raise TypeError("Trajectories must be a list")
     for trajectory in trajectories:
         if not isinstance(trajectory, np.ndarray):
             raise TypeError("Trajectories must be a list of numpy arrays")
         elif len(trajectory.shape) != 2:
-            raise ValueError("Trajectories must be a list of numpy arrays of shape (n, 2)")
+            raise ValueError(
+                "Trajectories must be a list of numpy arrays of shape (n, 2)"
+            )
         elif trajectory.shape[1] != 2:
-            raise ValueError("Trajectories must be a list of numpy arrays of shape (n, 2)")
+            raise ValueError(
+                "Trajectories must be a list of numpy arrays of shape (n, 2)"
+            )
 
     # Partition the trajectories
     if progress_bar:
@@ -479,9 +608,17 @@ def traclus(trajectories, max_eps=None, min_samples=10, directional=True, use_se
     i = 0
     for trajectory in trajectories:
         if progress_bar:
-            print(f"\rTrajectory {i + 1}/{len(trajectories)}", end='')
+            print(f"\rTrajectory {i + 1}/{len(trajectories)}", end="")
             i += 1
-        partitions.append(partition(trajectory, directional=directional, progress_bar=False, w_perpendicular=mdl_weights[0], w_angular=mdl_weights[2]))
+        partitions.append(
+            partition(
+                trajectory,
+                directional=directional,
+                progress_bar=False,
+                w_perpendicular=mdl_weights[0],
+                w_angular=mdl_weights[2],
+            )
+        )
     if progress_bar:
         print()
 
@@ -493,13 +630,20 @@ def traclus(trajectories, max_eps=None, min_samples=10, directional=True, use_se
         i = 0
         for parts in partitions:
             if progress_bar:
-                print(f"\rPartition {i + 1}/{len(parts)}", end='')
+                print(f"\rPartition {i + 1}/{len(parts)}", end="")
             segments += partition2segments(parts)
     else:
         segments = partitions
 
     # Get distance matrix
-    dist_matrix = get_distance_matrix(segments, directional=directional, w_perpendicular=d_weights[0], w_parallel=d_weights[1], w_angular=d_weights[2], progress_bar=progress_bar)
+    dist_matrix = get_distance_matrix(
+        segments,
+        directional=directional,
+        w_perpendicular=d_weights[0],
+        w_parallel=d_weights[1],
+        w_angular=d_weights[2],
+        progress_bar=progress_bar,
+    )
 
     # Group the partitions
     if progress_bar:
@@ -507,12 +651,16 @@ def traclus(trajectories, max_eps=None, min_samples=10, directional=True, use_se
     clusters = []
     clustering_model = None
     if max_eps is not None:
-        clustering_model = clustering_algorithm(max_eps=max_eps, min_samples=min_samples)
+        clustering_model = clustering_algorithm(
+            max_eps=max_eps, min_samples=min_samples
+        )
     else:
         clustering_model = clustering_algorithm(min_samples=min_samples)
     cluster_assignments = clustering_model.fit_predict(dist_matrix)
     for c in range(min(cluster_assignments), max(cluster_assignments) + 1):
-        clusters.append([segments[i] for i in range(len(segments)) if cluster_assignments[i] == c])
+        clusters.append(
+            [segments[i] for i in range(len(segments)) if cluster_assignments[i] == c]
+        )
 
     if progress_bar:
         print()
@@ -526,7 +674,15 @@ def traclus(trajectories, max_eps=None, min_samples=10, directional=True, use_se
     if progress_bar:
         print()
 
-    return partitions, segments, dist_matrix, clusters, cluster_assignments, representative_trajectories
+    return (
+        partitions,
+        segments,
+        dist_matrix,
+        clusters,
+        cluster_assignments,
+        representative_trajectories,
+    )
+
 
 # Create the script version that takes in a file path for inputs
 if __name__ == "__main__":
@@ -534,16 +690,51 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Trajectory Clustering Algorithm")
     parser.add_argument("input_file", help="The input file path (pickle format)")
     parser.add_argument("output_file", help="The output file path (pickle format)")
-    parser.add_argument("-e", "--eps", help="The epsilon value for the clustering algorithm", type=float, default=2)
-    parser.add_argument("-m", "--min_samples", help="The minimum samples value for the clustering algorithm", type=int, default=3)
-    parser.add_argument("-p", "--progress_bar", help="Show the progress bar", action="store_true")
+    parser.add_argument(
+        "-e",
+        "--eps",
+        help="The epsilon value for the clustering algorithm",
+        type=float,
+        default=2,
+    )
+    parser.add_argument(
+        "-m",
+        "--min_samples",
+        help="The minimum samples value for the clustering algorithm",
+        type=int,
+        default=3,
+    )
+    parser.add_argument(
+        "-p", "--progress_bar", help="Show the progress bar", action="store_true"
+    )
     args = parser.parse_args()
 
     # Load the trajectories
     trajectories = load_trajectories(args.input_file)
 
     # Run the TraClus algorithm
-    partitions, segments, dist_matrix, clusters, cluster_assignments, representative_trajectories = traclus(trajectories, eps=args.eps, min_samples=args.min_samples, progress_bar=args.progress_bar)
+    (
+        partitions,
+        segments,
+        dist_matrix,
+        clusters,
+        cluster_assignments,
+        representative_trajectories,
+    ) = traclus(
+        trajectories,
+        eps=args.eps,
+        min_samples=args.min_samples,
+        progress_bar=args.progress_bar,
+    )
 
     # Save the results
-    save_results(args.output_file, trajectories, partitions, segments, dist_matrix, clusters, cluster_assignments, representative_trajectories)
+    save_results(
+        args.output_file,
+        trajectories,
+        partitions,
+        segments,
+        dist_matrix,
+        clusters,
+        cluster_assignments,
+        representative_trajectories,
+    )
